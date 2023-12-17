@@ -36,6 +36,20 @@
 #define NO_SANITIZE_MEMORY
 #endif  // __has_attribute
 
-#define NO_SANITIZE NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
+// https://clang.llvm.org/docs/SanitizerCoverage.html#disabling-instrumentation-with-attribute-no-sanitize-coverage
+#ifdef __has_feature
+
+#if __has_feature(coverage_sanitizer)
+#define NO_SANITIZE_COVERAGE __attribute__((no_sanitize("coverage")))
+#else // __has_feature(coverage_sanitizer)
+#warning "compiler does not provide 'coverage_sanitizer' feature"
+#define NO_SANITIZE_COVERAGE
+#endif // __has_feature(coverage_sanitizer)
+
+#else // __has_feature
+#warning "compiler does not provide __has_feature, can't check for sanitization"
+#endif // __has_feature
+
+#define NO_SANITIZE NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY NO_SANITIZE_COVERAGE
 
 #endif  // LUZER_MACROS_H_

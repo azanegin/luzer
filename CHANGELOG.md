@@ -14,3 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration with libFuzzer's `FuzzedDataProvider`.
 - Examples with tests.
 - Documentation with usecases, API etc.
+
+### Fixed
+- Interfering coverage instrumentation of fuzzer internals (#11)
+
