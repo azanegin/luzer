@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation with usecases, API etc.
 - Support for command line arguments for libfuzzer.
 - Environment variable to disable parsing of command line arguments for libfuzzer - `LUZER_NOT_USE_CLI_ARGS_FOR_LF`.
+- Two ways to approximate amount of counters for interpreted code.
 
 ### Fixed
 - Interfering coverage instrumentation of fuzzer internals (#11)
+- Interpreted code counter never handed to libfuzzer. (#12)
+- Bad lifetime and initization of struct sigaction.
