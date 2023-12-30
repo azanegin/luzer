@@ -1,5 +1,5 @@
-#ifndef LUZER_MACROS_H_
-#define LUZER_MACROS_H_
+#ifndef LUZER_H_
+#define LUZER_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,4 +10,4 @@ int luaL_mutate(lua_State *L);
 } /* extern "C" */
 #endif
 
-#endif  // LUZER_MACROS_H_
+#endif  // LUZER_H_
