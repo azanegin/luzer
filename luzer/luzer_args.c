@@ -110,6 +110,8 @@ get_args_from_table(lua_State *L, struct Luzer_args *table_args, struct Luzer_ar
 	return 0;
 }
 
+char *corpus_path;
+
 NO_SANITIZE static int
 merge_args(struct Luzer_args *cli_args, struct Luzer_args *table_args, struct Luzer_args *total_args) {
 	total_args->argc = (cli_args->argc + table_args->argc + 1);
