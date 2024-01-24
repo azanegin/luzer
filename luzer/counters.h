@@ -18,11 +18,11 @@ int get_max_counters(void);
 int reserve_counter(void);
 // Reserves a number of counters with contiguous indices, and returns the first
 // index.
-int reserve_counters(int counters);
+int reserve_counters(int amount);
 
 // Increments a counter at the given index. If more than the maximum number of
 // counters has been reserved, reuse counters.
-void increment_counter(int counter_index);
+void increment_counter(int index);
 
 typedef struct counter_and_pc_table_range {
 	unsigned char* counters_start;
