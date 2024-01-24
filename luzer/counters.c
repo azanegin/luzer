@@ -52,9 +52,9 @@ test_only_reset_counters(void) {
 }
 
 NO_SANITIZE int
-reserve_counters(int counters) {
+reserve_counters(int amount) {
 	int ret = counter_index;
-	counter_index += counters;
+	counter_index += amount;
 	return ret;
 }
 
@@ -65,13 +65,15 @@ reserve_counter(void)
 }
 
 NO_SANITIZE void
-increment_counter(int counter_index)
+increment_counter(int index)
 {
 	if (counters != NULL && pctable != NULL) {
-		// `counters` is an allocation of length `max_counters`. If we reserve more
-		// than the allocated number of counters, we'll wrap around and overload
-		// old counters, trading away fuzzing quality for limits on memory usage.
-		counters[counter_index % max_counters]++;
+		// Global array `counters` is an allocation of length `max_counters`.
+                // But we use only registered amount of them.
+                // If we reserve more than the allocated number of counters, we'll wrap
+                // around and overload old counters, trading away fuzzing quality
+                // for limits on memory usage.
+		counters[index % counter_index_registered]++;
 	}
 }
 
