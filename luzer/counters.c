@@ -25,12 +25,12 @@ void __sanitizer_cov_pcs_init(uint8_t* pcs_beg, uint8_t* pcs_end);
 static const int kDefaultNumCounters = 1 << 20;
 
 // Number of counters requested by Lua instrumentation.
-int counter_index = 0;
+size_t counter_index = 0;
 // Number of counters given to Libfuzzer.
-int counter_index_registered = 0;
+size_t counter_index_registered = 0;
 // Maximum number of counters and pctable entries that may be reserved and also
 // the number that are allocated.
-int max_counters = 0;
+size_t max_counters = 0;
 // Counter Allocations. These are allocated once, before __sanitize_... are
 // called and can only be deallocated by test_only_reset_counters.
 unsigned char* counters = NULL;
@@ -52,7 +52,7 @@ test_only_reset_counters(void) {
 }
 
 NO_SANITIZE int
-reserve_counters(int amount) {
+reserve_counters(size_t amount) {
 	int ret = counter_index;
 	counter_index += amount;
 	return ret;
@@ -65,9 +65,9 @@ reserve_counter(void)
 }
 
 NO_SANITIZE void
-increment_counter(int index)
+increment_counter(size_t index)
 {
-	if (counters != NULL && pctable != NULL) {
+	if (counters != NULL) {
 		// Global array `counters` is an allocation of length `max_counters`.
                 // But we use only registered amount of them.
                 // If we reserve more than the allocated number of counters, we'll wrap
@@ -78,7 +78,7 @@ increment_counter(int index)
 }
 
 NO_SANITIZE void
-set_max_counters(int max)
+set_max_counters(size_t max)
 {
 	if (counters != NULL && pctable != NULL) {
 		fprintf(stderr, "Internal error: attempt to set max number of counters after "
