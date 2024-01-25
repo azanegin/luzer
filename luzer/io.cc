@@ -33,13 +33,7 @@ extern "C" {
  * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerIO.cpp#L101
  */
 namespace fuzzer {
-	template<typename T>
-	class fuzzer_allocator<T>;
-	
-	template<typename T>
-	using Vector = std::vector<T, fuzzer_allocator<T>>;
-	
-	typedef Vector<uint8_t> Unit;
+	typedef Vector<uint8_t, fuzzer_allocator<uint8_t>> Unit;
 	typedef Vector<Unit> UnitVector;
 
 	void ReadDirToVectorOfUnits(
