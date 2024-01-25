@@ -81,7 +81,7 @@ map_over_dir_contents(char const *dirpath, int (*user_cb)(uint8_t const * data, 
 		return -2;
 	}
 
-	std::vector<Unit> seed_corpus;
+	Vector<Unit> seed_corpus;
 	fuzzer::ReadDirToVectorOfUnits(
 			dirpath,
 		       	&seed_corpus,
