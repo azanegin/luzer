@@ -33,16 +33,17 @@ extern "C" {
  * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerIO.cpp#L101
  */
 namespace fuzzer {
+	class fuzzer_allocator<uint8_t>;
 	typedef std::vector<uint8_t, fuzzer_allocator<uint8_t>> Unit;
 	typedef std::vector<Unit> UnitVector;
 
 	void ReadDirToVectorOfUnits(
 		const char *Path,
-		Vector<Unit> *V,
+		std::vector<Unit> *V,
 		long *Epoch,
                 size_t MaxSize,
 		bool ExitOnError,
-                Vector<std::string> *VPaths = 0
+                std::vector<std::string> *VPaths = 0
 	);
 
 	// void ReadDirToVectorOfUnits(
