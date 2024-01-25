@@ -26,7 +26,24 @@ extern "C" {
  * See link for source of this
  * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerDefs.h#L41
  */
-typedef std::vector<uint8_t> Unit;
+//typedef std::vector<uint8_t> Unit;
+template<typename T>
+class fuzzer_allocator: public std::allocator<T> {
+	public:
+	fuzzer_allocator() = default;
+	
+	template<class U>
+	fuzzer_allocator(const fuzzer_allocator<U>&) {}
+	
+	template<class Other>
+	struct rebind { typedef fuzzer_allocator<Other> other;  };
+};
+
+template<typename T>
+using Vector = std::vector<T, fuzzer_allocator<T>>;
+
+typedef Vector<uint8_t> Unit;
+typedef Vector<Unit> UnitVector;
 
 /**
  * See link for source of this
@@ -35,10 +52,21 @@ typedef std::vector<uint8_t> Unit;
 namespace fuzzer {
 	void ReadDirToVectorOfUnits(
 		const char *Path,
-		std::vector<Unit> *V, long *Epoch,
-		size_t MaxSize,
+		Vector<Unit> *V,
+		long *Epoch,
+                size_t MaxSize,
 		bool ExitOnError,
-		std::vector<std::string> *VPaths);
+                Vector<std::string> *VPaths = 0
+	);
+
+	// void ReadDirToVectorOfUnits(
+	// 	const char *Path,
+	// 	std::vector<Unit> *V,
+	// 	long *Epoch,
+	// 	size_t MaxSize,
+	// 	bool ExitOnError,
+	// 	std::vector<std::string> *VPaths
+	// );
 	bool IsDirectory(const std::string &Path);
 }
 
