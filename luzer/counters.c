@@ -124,7 +124,7 @@ allocate_counters_and_pcs(void) {
 		}
 	}
 
-	const int next_index = MIN(counter_index, max_counters);
+	const size_t next_index = MIN(counter_index, max_counters);
 	if (counter_index_registered >= next_index) {
 		// There are no counters to pass. Perhaps because we've reserved more than
 		// max_counters, or because no counters have been reserved since this was
