@@ -28,7 +28,7 @@ extern "C" {
  * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerDefs.h#L41
  */
 namespace fuzzer {
-#if __clang_major__ < 14
+#if __clang_major__ >= 14
 	template<typename T>
 	class fuzzer_allocator: public std::allocator<T> {
 	public:
