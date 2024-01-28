@@ -33,18 +33,34 @@ extern "C" {
  * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerIO.cpp#L101
  */
 namespace fuzzer {
-	class fuzzer_allocator<uint8_t>;
-	typedef std::vector<uint8_t, fuzzer_allocator<uint8_t>> Unit;
-	typedef std::vector<Unit> UnitVector;
+	template<typename T>
+	class fuzzer_allocator: public std::allocator<T> {
+	public:
+		fuzzer_allocator() = default;
+		
+		template<class U>
+		fuzzer_allocator(const fuzzer_allocator<U>&) {}
+		
+		template<class Other>
+		struct rebind { typedef fuzzer_allocator<Other> other;  };
+	};
 
-	void ReadDirToVectorOfUnits(
-		const char *Path,
-		std::vector<Unit> *V,
-		long *Epoch,
+
+        template<typename T>
+        using Vector = std::vector<T, fuzzer_allocator<T>>;
+
+        typedef Vector<uint8_t> Unit;
+
+        typedef Vector<Unit> UnitVector;
+
+        void ReadDirToVectorOfUnits(
+                const char *Path,
+                Vector<Unit> *V,
+                long *Epoch,
                 size_t MaxSize,
-		bool ExitOnError,
-                std::vector<std::string> *VPaths = 0
-	);
+                bool ExitOnError,
+                Vector<std::string> *VPaths = 0
+        );
 
 	// void ReadDirToVectorOfUnits(
 	// 	const char *Path,
@@ -68,7 +84,7 @@ map_over_dir_contents(char const *dirpath, int (*user_cb)(uint8_t const * data, 
 		return -2;
 	}
 
-	Vector<Unit> seed_corpus;
+	fuzzer::UnitVector seed_corpus;
 	fuzzer::ReadDirToVectorOfUnits(
 			dirpath,
 		       	&seed_corpus,
