@@ -52,7 +52,7 @@ namespace fuzzer {
 
         void ReadDirToVectorOfUnits(
                 const char *Path,
-                Vector<fuzzer::Unit> *V,
+                Vector<Unit> *V,
                 long *Epoch,
                 size_t MaxSize,
                 bool ExitOnError,
