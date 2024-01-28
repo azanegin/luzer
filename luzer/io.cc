@@ -46,7 +46,7 @@ namespace fuzzer {
 #else // __clang_major__ < 14
 	template<typename T>
 	using Vector = std::vector<T>;
-#end
+#endif
 
 	typedef Vector<uint8_t> Unit;
 
@@ -73,7 +73,7 @@ map_over_dir_contents(char const *dirpath, int (*user_cb)(uint8_t const * data, 
 		return -2;
 	}
 
-	fuzzer::Vector<Unit> seed_corpus;
+	fuzzer::Vector<fuzzer::Unit> seed_corpus;
 
 	fuzzer::ReadDirToVectorOfUnits(
 		dirpath,
