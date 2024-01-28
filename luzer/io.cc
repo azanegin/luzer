@@ -23,16 +23,12 @@ extern "C" {
 }
 
 /**
- * See link for source of this
+ * See links for source of this
+ * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerIO.cpp#L101
  * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerDefs.h#L41
  */
-//typedef std::vector<uint8_t> Unit;
-
-/**
- * See link for source of this
- * https://github.com/llvm/llvm-project/blob/493cc71d72c471c841b490f30dd8f26f3a0d89de/compiler-rt/lib/fuzzer/FuzzerIO.cpp#L101
- */
 namespace fuzzer {
+#if __clang_major__ < 14
 	template<typename T>
 	class fuzzer_allocator: public std::allocator<T> {
 	public:
@@ -45,13 +41,14 @@ namespace fuzzer {
 		struct rebind { typedef fuzzer_allocator<Other> other;  };
 	};
 
+	template<typename T>
+	using Vector = std::vector<T, fuzzer_allocator<T>>;
+#else // __clang_major__ < 14
+	template<typename T>
+	using Vector = std::vector<T>;
+#end
 
-        template<typename T>
-        using Vector = std::vector<T, fuzzer_allocator<T>>;
-
-        typedef Vector<uint8_t> Unit;
-
-        typedef Vector<Unit> UnitVector;
+	typedef Vector<uint8_t> Unit;
 
         void ReadDirToVectorOfUnits(
                 const char *Path,
@@ -62,14 +59,6 @@ namespace fuzzer {
                 Vector<std::string> *VPaths = 0
         );
 
-	// void ReadDirToVectorOfUnits(
-	// 	const char *Path,
-	// 	std::vector<Unit> *V,
-	// 	long *Epoch,
-	// 	size_t MaxSize,
-	// 	bool ExitOnError,
-	// 	std::vector<std::string> *VPaths
-	// );
 	bool IsDirectory(const std::string &Path);
 }
 
@@ -84,15 +73,16 @@ map_over_dir_contents(char const *dirpath, int (*user_cb)(uint8_t const * data, 
 		return -2;
 	}
 
-	fuzzer::UnitVector seed_corpus;
+	fuzzer::Vector<Unit> seed_corpus;
+
 	fuzzer::ReadDirToVectorOfUnits(
-			dirpath,
-		       	&seed_corpus,
-		       	/*Epoch = */nullptr,
-		       	/*MaxSize = */SIZE_MAX,
-		       	/*ExitOnError = */false,
-			/*VPaths = */nullptr
-			);
+		dirpath,
+		&seed_corpus,
+		/*Epoch = */nullptr,
+		/*MaxSize = */SIZE_MAX,
+		/*ExitOnError = */false,
+		/*VPaths = */nullptr
+	);
 
 	for (auto unit : seed_corpus) {
 		user_cb(unit.data(), unit.size());
