@@ -27,7 +27,7 @@
 #include "luzer_args.h"
 #include "luzer.h"
 
-#define GLOBAL_BYTECODE_TO_COUNTERS_SCALE 4
+#define GLOBAL_BYTECODE_TO_COUNTERS_SCALE 1
 
 #define TEST_ONE_INPUT_FUNC "luzer_test_one_input"
 #define CUSTOM_MUTATOR_FUNC "luzer_custom_mutator"
