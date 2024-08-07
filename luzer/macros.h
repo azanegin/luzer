@@ -63,8 +63,8 @@
 #endif // __has_feature(coverage_sanitizer)
 
 #else // __has_feature
-#warning "compiler does not provide __has_feature,"
-#warning "can't check presence of 'coverage_sanitizer' feature"
+
+#warning "compiler does not provide __has_feature, can't check for sanitization"
 #endif // __has_feature
 
 #define NO_SANITIZE NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY NO_SANITIZE_COVERAGE

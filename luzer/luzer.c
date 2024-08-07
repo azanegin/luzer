@@ -25,7 +25,10 @@
 #include "macros.h"
 #include "tracer.h"
 #include "version.h"
+#include "luzer_args.h"
 #include "luzer.h"
+
+#define GLOBAL_BYTECODE_TO_COUNTERS_SCALE 1
 
 #define TEST_ONE_INPUT_FUNC "luzer_test_one_input"
 #define CUSTOM_MUTATOR_FUNC "luzer_custom_mutator"
@@ -208,15 +211,6 @@ luaL_test_one_input(lua_State *L)
 
 NO_SANITIZE int
 TestOneInput(const uint8_t* data, size_t size) {
-	const counter_and_pc_table_range alloc = allocate_counters_and_pcs();
-	if (alloc.counters_start && alloc.counters_end) {
-		__sanitizer_cov_8bit_counters_init(alloc.counters_start,
-										   alloc.counters_end);
-	}
-	if (alloc.pctable_start && alloc.pctable_end) {
-		__sanitizer_cov_pcs_init(alloc.pctable_start, alloc.pctable_end);
-	}
-
 	lua_State *L = get_global_lua_state();
 
 	/**
@@ -316,60 +310,140 @@ load_custom_mutator_lib(void) {
 	return 0;
 }
 
+/**
+ * Tries to asses how much bytecode there are loaded.
+ *
+ * I looked into lua's introspection capabilities, could not find anything good.
+ * There is https://github.com/leegao/see.lua but I don't think it is a good idea
+ * to make a PR with code for 5 different versions of a library to someone else's lib.
+ * Their idea is simple - decode bytecode in runtime.
+ * There is also https://github.com/siffiejoe/lua-getsize but reasoning is the same.
+ * They take signatures for 'struct Prototype' with them. Having them allow to
+ * see what Lua interpreter thinks sizes are.
+ * So here we sit, in quite a pickle, yearning for a lua-native crossplatform solution.
+ *
+ * Basically, this is stupid and straigtforward - table tree walk from '_G'.
+ * '_G' is Lua's special table for global stuff.
+ * 'string.dump' works even in latest LuaJIT. Bytecode is not crossplatform but we don't
+ * need that.
+ * This will count everything in global scope and in proper packages due to 'package.loaded'.
+ * I found no way to access anything local without a reference to an activation record.
+ *
+ * It may be possible to find every stack somehow and walk every frame and do a 'getlocal'
+ * and 'getupvalue' on them. No 'getstack' from within Lua tho, so one will have to write
+ * that in C.
+ * With 'struct Prototype' locals would be a cakewalk.
+ *
+ * This also can be written in C, but I see no reason for it. It should run only once.
+ * And C implementation would require much more time.
+ */
+NO_SANITIZE static inline __attribute__((unused)) int
+lua_approx_global_bytecode_size(lua_State *L)
+{
+	int error = 0;
+	static char const lua_func_source[] = ""
+	"function _CountGlobalBytecodeSize()\n"
+		"local seen = {}\n"
+		"local bytecode_size = 0\n"
+		"local function what(x) return debug.getinfo(x, 'S').what end\n"
+		"local function recurse(table_to_count, tables_to_recurse)\n"
+			"if table_to_count == nil and #tables_to_recurse == 0 then\n"
+				"return\n"
+			"end\n"
+			"seen[table_to_count] = true\n"
+			"for k, v in pairs(table_to_count) do\n"
+				"if type(v) == 'function' and what(v) == 'Lua' then\n"
+					"-- we dont care for already-seen funcs\n"
+					"bytecode_size = bytecode_size + string.len(string.dump(v))\n"
+				"end\n"
+				"if type(v) == 'table' and not seen[v] then\n"
+					"tables_to_recurse[#tables_to_recurse+1] = v\n"
+					"seen[v]=true\n"
+				"end\n"
+			"end\n"
+			"local next_table = table.remove(tables_to_recurse)\n"
+			"-- tail call is expected\n"
+			"return recurse(next_table, tables_to_recurse)\n"
+		"end\n"
+		"recurse(_G, {})\n"
+		"return bytecode_size\n"
+	"end\n"
+	"return _CountGlobalBytecodeSize()\n"
+	"";
+	error = luaL_loadbuffer(L, lua_func_source, strlen(lua_func_source), "line") || lua_pcall(L, 0, 1, 0);
+	if (error) {
+		fprintf(stderr, "%s", lua_tostring(L, -1));
+		lua_pop(L, 1);  /* pop error message from the stack */
+		return -1;
+	}
+	/* NOTE: there is no guarantees for lua_Number type
+	 * it is usually 'double', but totally okay for lua install to have it be 'float' or even 'long'.
+	 * Any C compile-time checks I know would require C11 compiler and even then will just produce warn
+	 */
+	lua_Number inner_lua_retval = lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	/* let compiler do the implicit conversion and remember we theoretically can be too large for int */
+	return inner_lua_retval;
+}
+
+
+extern int map_over_dir_contents(char const *dirpath, int (*user_cb)(uint8_t const * data, size_t length));
+
+/**
+ * Runs target over some inputs to assess how much counters we really need
+ *
+ * Now, without interpreter introspection, another way to count how much counters
+ * we need is to... simply count how much can we trigger. LF doesn't have special run
+ * modes for this; so we do this hack-y way. Alternative hook just counts trigger times,
+ * not unique positions, so we should probably need no additional multipliers to get
+ * less collisions.
+ *
+ * All regular files below the path (means recursive walk) would be used as a seed input.
+ */
+NO_SANITIZE static inline int
+lua_preseed_counters(lua_State *L, char const * seed_dir_path)
+{
+	int retval = 0;
+	char const * path_copy = strdup(seed_dir_path);
+	if (NULL == path_copy) {
+		return -3;
+	}
+	lua_sethook(L, collector_debug_hook, LUA_MASKCALL | LUA_MASKLINE, 0);
+	retval = map_over_dir_contents(path_copy, TestOneInput);
+	free((void*)path_copy);
+	lua_sethook(L, NULL, 0, 0);
+	return retval;
+}
+
+NO_SANITIZE static inline int
+lua_ctrs_alloc_notify_lf(lua_State *L)
+{
+	static int init_cntr = 0;
+	static counter_and_pc_table_range alloc;
+	if (0 == init_cntr) {
+		alloc = allocate_counters_and_pcs();
+		init_cntr = 1;
+	}
+	if (alloc.counters_start && alloc.counters_end) {
+		__sanitizer_cov_8bit_counters_init(alloc.counters_start, alloc.counters_end);
+	} else {
+		luaL_error(L, "counters not allocated");
+	}
+	if (alloc.pctable_start && alloc.pctable_end) {
+		__sanitizer_cov_pcs_init(alloc.pctable_start, alloc.pctable_end);
+	} else {
+		luaL_error(L, "pcs not allocated");
+	}
+	return 0;
+}
+
 NO_SANITIZE static int
 luaL_fuzz(lua_State *L)
 {
-	if (lua_istable(L, -1) == 0) {
-		luaL_error(L, "opts is not a table");
-	}
-	lua_pushnil(L);
+        char **argv = NULL;
+        int argc = 0;
 
-	/* Processing a table with options. */
-	int argc = 0;
-	char **argv = malloc(1 * sizeof(char*));
-	if (!argv)
-		luaL_error(L, "not enough memory");
-	const char *corpus_path = NULL;
-	while (lua_next(L, -2) != 0) {
-		char **argvp = realloc(argv, sizeof(char*) * (argc + 1));
-		if (argvp == NULL) {
-			free(argv);
-			luaL_error(L, "not enough memory");
-		}
-		const char *key = lua_tostring(L, -2);
-		const char *value = lua_tostring(L, -1);
-		if (strcmp(key, "corpus") != 0) {
-			size_t arg_len = strlen(key) + strlen(value) + 3;
-			char *arg = calloc(arg_len, sizeof(char));
-			if (!arg)
-				luaL_error(L, "not enough memory");
-			snprintf(arg, arg_len, "-%s=%s", key, value);
-			argvp[argc] = arg;
-			argc++;
-		} else {
-			corpus_path = strdup(value);
-		}
-		lua_pop(L, 1);
-		argv = argvp;
-	}
-	if (corpus_path) {
-		argv[argc] = (char*)corpus_path;
-		argc++;
-	}
-	if (argc == 0) {
-		argv[argc] = "";
-		argc++;
-	}
-	argv[argc] = NULL;
-	lua_pop(L, 1);
-
-#ifdef DEBUG
-	char **p = argv;
-	while(*p++) {
-		if (*p)
-			DEBUG_PRINT("libFuzzer arg - '%s'\n", *p);
-	}
-#endif /* DEBUG */
+        get_fuzz_args(L, &argv, &argc);
 
 	/* Processing a function with custom mutator. */
 	if (!lua_isnil(L, -1) && (lua_isfunction(L, -1) == 1)) {
@@ -388,7 +462,8 @@ luaL_fuzz(lua_State *L)
 
 	lua_pushboolean(L, 1);
 
-	struct sigaction act;
+	/* this should have a proper lifetime and at least zero-initialization */
+	static struct sigaction act;
 	act.sa_handler = sig_handler;
 	sigaction(SIGINT, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);
@@ -400,6 +475,28 @@ luaL_fuzz(lua_State *L)
 	lua_pop(L, -1);
 
 	set_global_lua_state(L);
+
+	/* now we need to allocate counters for interpreted code
+	 * but how much? let us try to approximate */
+	/* strategy 1: scan lua interpreter from inside, count bytecode */
+	reserve_counters(lua_approx_global_bytecode_size(L) * GLOBAL_BYTECODE_TO_COUNTERS_SCALE);
+
+	/* strategy 2: run the target with select inputs, count how many times the hook even triggers */
+	if (NULL != corpus_path) {
+		if (lua_preseed_counters(L, corpus_path)) {
+			fprintf(stderr, "WARN: luzer tried but failed to preseed counters\n");
+		}
+	}
+	lua_ctrs_alloc_notify_lf(L);
+
+	/**
+	 * Hook is called when the Lua interpreter calls a function and when the
+	 * interpreter is about to start the execution of a new line of code, or
+	 * when it jumps back in the code (even to the same line).
+	 * https://www.lua.org/pil/23.2.html
+	 */
+	lua_sethook(L, debug_hook, LUA_MASKCALL | LUA_MASKLINE, 0);
+
 	int rc = LLVMFuzzerRunDriver(&argc, &argv, &TestOneInput);
 	luaL_cleanup(L);
 

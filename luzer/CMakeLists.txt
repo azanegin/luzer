@@ -11,6 +11,8 @@ set(LUZER_SOURCES luzer.c
                   fuzzed_data_provider.cc
                   tracer.c
                   counters.c
+                  luzer_args.c
+                  io.cc
                   ${CMAKE_CURRENT_BINARY_DIR}/version.c)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED ${LUZER_SOURCES})
