@@ -68,8 +68,23 @@ map_over_dir_contents(char const *dirpath, int (*user_cb)(uint8_t const * data, 
 	if (nullptr == user_cb || nullptr == dirpath) {
 		return -1;
 	}
-
-	if (!fuzzer::IsDirectory(dirpath)) {
+	/* Hear me out before screaming, this is for compiler/linker compatibility 
+	 * either STL or linkage is SOMEHOW different between clang-14 and clang-18
+	 * if we use std::basic_string constructor, either implicitly or explicitly
+	 * modern clang doesn't put it in PLT, while other parts of STL is in PLT
+	 * 
+	 * This end with glibc not marking `link_map`s as `l_map_used`
+	 * thus not invoking shared-object-level destructors at `dlclose`
+	 * 
+	 * This won't be so bad usually, but we set exit handlers... 
+	 * They end up accessing lua_State after leaving interpreter `main`
+	 * instead of in `ll_unloadlib`. Ergo segfault. 
+	 * 
+	 * Explicit call to `string.assign` somehow fixes this */
+	static std::string stringbuffer;
+	stringbuffer.assign(dirpath);
+	
+	if (!fuzzer::IsDirectory(stringbuffer)) {
 		return -2;
 	}
 
